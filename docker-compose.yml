@@ -1,0 +1,436 @@
+version: '3.1'
+# Updated September 7th 2021
+
+services:
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+    environment: # verticle-flowhook-datasource,
+      GF_INSTALL_PLUGINS: yesoreyeram-boomtheme-panel, agenty-flowcharting-panel, grafana-github-datasource, fifemon-graphql-datasource
+    restart: unless-stopped
+    labels:
+      - "traefik.http.routers.grafana-router.rule=Host(`grafana.yourdnsname.duckdns.org`)"
+      #- "traefik.http.routers.grafana-router.entrypoints=websecure"
+      - "traefik.enable=true"
+      - "traefik.port=3000"
+   
+  # prometheus:
+  #   image: prom/prometheus
+  #   volumes:
+  #     - ./prometheus/conf:/etc/prometheus/
+  #     - ./prometheus/data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #     - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+  #     - '--web.console.templates=/usr/share/prometheus/consoles'
+  #   ports:
+  #     - 9090:9090
+  #   restart: unless-stopped
+  #   labels:
+  #     - "traefik.http.routers.prometheus-router.rule=Host(`prometheus.yourdnsname.duckdns.org`)
+  #     - "traefik.enable=true"
+  #     - "traefik.port=9090"
+  
+  influxdb:
+    image: influxdb
+    ports:
+      - "8089:8089/udp"
+      - "8086:8086"
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb
+      - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+    environment:
+      INFLUXDB_DB: pfsense
+      INFLUXDB_ADMIN_USER: admin
+      INFLUXDB_ADMIN_PASSWORD: password
+      INFLUXDB_USER: telegraf
+      INFLUXDB_USER_PASSWORD: telegraf
+      INFLUXDB_UDP_ENABLED: "true"
+      INFLUXDB_UDP_DATABASE: traefik
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v2.3.5
+    command: 
+      - '--api.insecure=true --providers.docker'
+      # - --certresolv.myresolver.acme.storage=/shared/acme.json
+      - --serversTransport.insecureSkipVerify=true
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://192.168.1.101:3100/loki/api/v1/push"
+    ports:
+      - "8080:8080" # Please read: https://docs.traefik.io/configuration/api/#security
+      - "443:443"
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik.yml:/traefik.yml
+      #- ./shared:/shared
+    environment:
+      - DUCKDNS_TOKEN=4d3fbc7c-718f-4807-ba8e-7fca0a14177e
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.traefik.rule=Host(`traefik.yourdnsname.duckdns.org`)'
+      #- 'traefik.http.routers.traefik.entrypoints=websecure'
+      - 'traefik.http.routers.traefik.service=api@internal'
+      # - "traefik.http.routers.traefik.tls.certresolver=le"
+      #- 'traefik.http.routers.traefik.tls=true'
+
+  portfolio-backend:
+    build: "../git/portfolio-backend/."
+    image: portfolio-backend:0.0.1
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://192.168.1.101:3100/loki/api/v1/push"
+    ports:
+      - "8090:8090"
+    labels:
+      #- "traefik.http.routers.portfolio-backend.rule=Host(`portfolio-backend.docker.localhost`)"
+      - "traefik.http.routers.portfolio-backend.rule=Host(`yourdnsname.duckdns.org`)"
+      - "traefik.backend=portfolio-backend"
+      - "traefik.http.routers.portfolio-backend.tls=true"
+      - "traefik.http.routers.portfolio-backend.tls.certresolver=le"
+      - "traefik.http.routers.portfolio-backend.entrypoints=websecure"
+      - "traefik.frontend.rule=Host:portfolio-backend"
+      - "traefik.port=8090"
+      - "traefik.enable=true"
+
+  mesa-simulation:
+    build: 
+      context: ../git/mesa-covid-simulation/
+      dockerfile: "Dockerfile2"
+    image: mesa-simulation:dev
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://192.168.1.101:3100/loki/api/v1/push"
+    volumes:
+      - ../git/mesa-covid-simulation:/opt/mesa
+        #ports:
+        #- "9061-9161:9061"
+    deploy:
+      replicas: 10
+    labels:
+      - "traefik.http.routers.mesa-simulation.rule=Host(`mesa-simulation.yourdnsname.duckdns.org`)"
+      - "traefik.port=9061"
+      - "traefik.enable=true"
+      - "traefik.http.routers.mesa-simulation.entrypoints=websecure"
+      - "traefik.http.routers.mesa-simulation.tls=true"
+      - "traefik.http.routers.mesa-simulation.tls.certresolver=le"
+      - "traefik.frontend.rule=Host:mesa-simulation"
+  
+  # authelia:
+  #   image: authelia/authelia
+  #   volumes:
+  #     - ./authelia:/config
+  #   # networks:
+  #   #   - net
+  #   labels:
+  #     - 'traefik.enable=true'
+  #     - 'traefik.http.routers.authelia.rule=Host(`login.yourdnsname.duckdns.org`)'
+  #     - 'traefik.http.routers.authelia.entrypoints=websecure'
+  #     - 'traefik.http.routers.authelia.tls=true'
+  #     - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://login.yourdnsname.duckdns.org/'
+  #     - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
+  #     - 'traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
+  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.address=http://authelia:9091/api/verify?auth=basic'
+  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.trustForwardHeader=true'
+  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
+  #   expose:
+  #     - 9091
+  #   restart: unless-stopped
+  #   environment:
+  #     - TZ=America/Chicago
+
+  #radarr:
+
+  gotify:
+    image: gotify/server
+    volumes:
+      - ./gotify/data:/app/data
+    #ports: 
+    #  - 8192:80
+    environment:
+      - TZ=America/Chicago
+    labels:
+      - "traefik.http.routers.gotify-router.rule=Host(`gotify.yourdnsname.duckdns.org`)"
+      - "traefik.enable=true"
+      - "traefik.port=80"
+
+  alertmanager:
+    image: prom/alertmanager
+    volumes:
+      - ./prometheus/conf:/prometheus
+      - ./prometheus/data/alertmanager:/data
+    command:
+      - '--config.file=/prometheus/alertmanager.yml'
+      - '--storage.path=/data'
+    # ports:
+    #   - 9093:9093
+    labels:
+      - "traefik.http.routers.alertmanager-router.rule=Host(`alertmanager.yourdnsname.duckdns.org`)"
+      - "traefik.enable=true"
+      - "traefik.port=9093"
+
+  loki:
+    image: grafana/loki:2.3.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    labels:
+      - "traefik.http.routers.loki-router.rule=Host(`loki.yourdnsname.duckdns.org`)"
+      - "traefik.enable=true"
+      - "traefik.port=3100"
+
+  promtail:
+    image: grafana/promtail:2.3.0
+    volumes:
+      - /var/log:/var/log
+    command: -config.file=/etc/promtail/config.yml
+
+  teamcity-server: # Have to make this schema inside db
+    image: jetbrains/teamcity-server
+    ports:
+      - "8111:8111"
+    volumes:
+      - ./teamcity-server/data:/data/teamcity_server/datadir
+      - ./teamcity-server/logs:/opt/teamcity/logs
+    labels:
+      - "traefik.http.routers.teamcity.rule=Host(`teamcity.yourdnsname.duckdns.org`)"
+      - "traefik.port=8111"
+      - "traefik.enable=true"
+
+  teamcity-agent-1:
+    image: jetbrains/teamcity-agent
+    privileged: true
+    volumes:
+      - ./teamcity-agent-1/conf:/data/teamcity_agent/conf
+    environment:
+      - DOCKER_IN_DOCKER=start
+
+  # pihole:
+  #   image: pihole/pihole:latest
+  #   ports:
+  #     #- "53:53/tcp"
+  #     #- "53:53/udp"
+  #     - "67:67/udp"
+  #     #- "80:80/tcp"
+  #   environment:
+  #     TZ: 'America/Chicago'
+  #     # WEBPASSWORD: 'set a secure password here or it will be random'
+  #   # Volumes store your data between container upgrades
+  #   volumes:
+  #     - './pihole/etc-pihole/:/etc/pihole/'
+  #     - './pihole/etc-dnsmasq.d/:/etc/dnsmasq.d/'
+  #   # Recommended but not required (DHCP needs NET_ADMIN)
+  #   #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+  #   cap_add:
+  #     - NET_ADMIN
+  #   restart: unless-stopped
+
+  gitlab:
+    image: 'gitlab/gitlab-ce:12.10.11-ce.0'
+    restart: unless-stopped
+    privileged: 'true'
+    hostname: 'gitlab.yourdnsname.duckdns.org'
+    labels:
+      #- "traefik.docker.network=traefik_network"
+      - "traefik.enable=true"
+      - "traefik.port=443"
+      #- "traefik.frontend.rule=Host:https://gitlab.yourdnsname.duckdns.org"
+      - "traefik.http.routers.gitlab.rule=Host(`gitlab.yourdnsname.duckdns.org`)"
+      #- "traefik.frontend.entryPoints=websecure"
+    healthcheck:
+      disable: true
+    environment:
+    # nginx['redirect_http_to_https'] = false
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://gitlab.yourdnsname.duckdns.org'
+        
+        nginx['listen_port'] = 443
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          'X-Forwarded-Proto' => 'https',
+          'X-Forwarded-Ssl' => 'on'
+        }
+        nginx['client_max_body_size'] = '2G'
+        unicorn['worker_timeout'] = 60
+        unicorn['worker_processes'] = 2
+        sidekiq['concurrency'] = 15
+        postgresql['shared_buffers'] = "512MB"
+        gitlab_rails['artifacts_enabled'] = true
+        gitlab_rails['artifacts_path'] = "/var/opt/gitlab/gitlab-artifacts"
+        gitlab_rails['lfs_enabled'] = true
+        gitlab_rails['backup_keep_time'] = 172600
+        gitlab_ci['backup_keep_time'] = 172600
+    # ports:
+    #   - '2222:22'
+    #   - '8043:443'
+    #   - '8088:80'
+    volumes:
+      - ./gitlab/config:/etc/gitlab
+      - ./gitlab/logs:/var/log/gitlab
+      - ./gitlab/data:/var/opt/gitlab
+      
+  redmine:
+    image: redmine
+    restart: unless-stopped
+    # ports:
+    #   - 8065:3000
+    environment:
+      REDMINE_DB_MYSQL: mysql
+      REDMINE_DB_USERNAME: root
+      REDMINE_DB_PASSWORD: password01
+      REDMINE_DB_DATABASE: redmine # Have to make this schema inside db
+      REDMINE_SECRET_KEY_BASE: supersecretkey
+      # REDMINE_PORT: 8065
+      # REDMINE_HTTPS: "true"
+    volumes:
+      - ./redmine/data:/home/redmine/data
+      - ./redmine/logs:/var/log/redmine
+    labels:
+      - "traefik.http.routers.redmine.rule=Host(`redmine.yourdnsname.duckdns.org`)"
+      - "traefik.http.routers.redmine.entrypoints=websecure"
+      - "traefik.port=3000"
+      - "traefik.enable=true"
+
+  mysql:
+    image: mysql:5.7
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password01
+      MYSQL_DATABASE: redmine-db
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+    ports: 
+      - 3306:3306
+    labels:
+      - "traefik.http.routers.mysql.rule=Host(`mysql.yourdnsname.duckdns.org`)"
+      - "traefik.port=3306"
+      - "traefik.enable=true"
+
+  rocketchat:
+    image: registry.rocket.chat/rocketchat/rocket.chat:latest
+    command: >
+      bash -c
+        "for i in `seq 1 30`; do
+          node main.js &&
+          s=$$? && break || s=$$?;
+          echo \"Tried $$i times. Waiting 5 secs...\";
+          sleep 5;
+        done; (exit $$s)"
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - PORT=3000
+      - ROOT_URL=http://localhost:3000
+      - MONGO_URL=mongodb://mongo:27017/rocketchat
+      - MONGO_OPLOG_URL=mongodb://mongo:27017/local
+      - MAIL_URL=smtp://smtp.email
+      #- HTTP_PROXY=http://proxy.domain.com
+      #- HTTPS_PROXY=http://proxy.domain.com
+    depends_on:
+      - mongo
+    #ports:
+      #- 3000:3000
+    labels:
+      - "traefik.backend=rocketchat"
+      - "traefik.frontend.rule=Host: rocketchat.yourdnsname.duckdns.org"
+      - "traefik.port=3000"
+
+  mongo:
+    image: mongo:4.0
+    restart: unless-stopped
+    volumes:
+     - ./mongo/data/db:/data/db
+     - ./mongo/data/dump:/dump
+    command: mongod --smallfiles --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+    labels:
+      - "traefik.enable=true"
+  # this container's job is just run the command to initialize the replica set.
+  # it will run the command and remove himself (it will not stay running)
+  mongo-init-replica:
+    image: mongo:4.0
+    command: >
+      bash -c
+        "for i in `seq 1 30`; do
+          mongo mongo/rocketchat --eval \"
+            rs.initiate({
+              _id: 'rs0',
+              members: [ { _id: 0, host: 'localhost:27017' } ]})\" &&
+          s=$$? && break || s=$$?;
+          echo \"Tried $$i times. Waiting 5 secs...\";
+          sleep 5;
+        done; (exit $$s)"
+    depends_on:
+      - mongo
+
+  # hubot, the popular chatbot (add the bot user first and change the password before starting this image)
+  hubot:
+    image: rocketchat/hubot-rocketchat:latest
+    restart: unless-stopped
+    environment:
+      - ROCKETCHAT_URL=rocketchat:3000
+      - ROCKETCHAT_ROOM=GENERAL
+      - ROCKETCHAT_USER=bot
+      - ROCKETCHAT_PASSWORD=botpassword
+      - BOT_NAME=bot
+  # you can add more scripts as you'd like here, they need to be installable by npm
+      - EXTERNAL_SCRIPTS=hubot-help,hubot-seen,hubot-links,hubot-diagnostics
+    depends_on:
+      - rocketchat
+    labels:
+      - "traefik.enable=true"
+    volumes:
+      - ./hubot/scripts:/home/hubot/scripts
+  # this is used to expose the hubot port for notifications on the host on port 3001, e.g. for hubot-jenkins-notifier
+    ports:
+      - 3001:8080
+
+  kanboard:
+    image: kanboard/kanboard:latest
+    ports:
+      - "8280:80"
+      - "8443:443"
+    volumes:
+      - ./kanboard/data:/var/www/app/data
+      - ./kanboard/plugins:/var/www/app/plugins
+      #- kanboard_ssl:/etc/nginx/ssl
+    environment:
+      DATABASE_URL: mysql://kanboard:kanboard-secret@db/kanboard
+    labels:
+      - "traefik.http.routers.mysql.rule=Host(`kanboard.yourdnsname.duckdns.org`)"
+      - "traefik.port=443"
+      - "traefik.enable=true"
+  db:
+    image: mariadb:latest
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: kanboard
+      MYSQL_USER: kanboard
+      MYSQL_PASSWORD: kanboard-secret
+
+  # morgue:
+  #   image: etsy/morgue
+
+  # artifactory:
+  #   image: jfrog/artifactory
+
+  # docker-registry:
+  #   image: jfrog/container-registry
+
+  # alerta
+  #   image: alerta
+
+networks: 
+  default:
+    external:
+      name: compose_default
