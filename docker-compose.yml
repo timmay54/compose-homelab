@@ -72,7 +72,7 @@ services:
       - ./traefik.yml:/traefik.yml
       #- ./shared:/shared
     environment:
-      - DUCKDNS_TOKEN=4d3fbc7c-718f-4807-ba8e-7fca0a14177e
+      - DUCKDNS_TOKEN=<22589631478521474102369963>
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.traefik.rule=Host(`traefik.yourdnsname.duckdns.org`)'
