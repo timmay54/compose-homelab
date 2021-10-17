@@ -12,7 +12,7 @@ services:
       GF_INSTALL_PLUGINS: yesoreyeram-boomtheme-panel, agenty-flowcharting-panel, grafana-github-datasource, fifemon-graphql-datasource
     restart: unless-stopped
     labels:
-      - "traefik.http.routers.grafana-router.rule=Host(`grafana.yourdnsname.duckdns.org`)"
+      - "traefik.http.routers.grafana-router.rule=Host(`grafana.${DOMAIN_NAME}`)"
       #- "traefik.http.routers.grafana-router.entrypoints=websecure"
       - "traefik.enable=true"
       - "traefik.port=3000"

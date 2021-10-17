@@ -1,6 +1,12 @@
 # compose-homelab
 Everything needed for a turnkey developer+devops+self-hosted system.
 
+## Quick Start: 
+1. `git clone https://github.com/timmay54/compose-homelab.git`
+2. `cd compose-homelab`
+3. `mv example.env .env`
+4. `docker-compose up -d`
+
 ## Description
 Easily stand up your own development, self hosted, and DevOps oriented stack. 
 Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek no credit of the following services, google them for more research):
@@ -37,3 +43,4 @@ Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek
 
 ## Contribute?
 There are so many undiscovered services, of which could make great alternatives
+### TO DO:
