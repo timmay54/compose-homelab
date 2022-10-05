@@ -1,11 +1,16 @@
 # compose-homelab
-Everything needed for a turnkey developer+devops+self-hosted system.
+Everything needed for a turnkey developer + devops + self-hosted system. Easily stand up your own development, self hosted, and DevOps oriented stack. 
 
-## Quick Start: 
-1. `git clone https://github.com/timmay54/compose-homelab.git`
-2. `cd compose-homelab`
-3. `mv example.env .env`
-4. `docker-compose up -d`
+## To Get Started (Quick)
+* Suggested system components: 
+  * RAM: 24GB
+  * CPU: 4 Core (Virtualization enabled)
+  * If on HyperVisor: Cache Writethrough & VT-d enabled
+* You will need [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/) installed on your system
+* You will need to portforward `80` & `443` for things to work as expected on your router
+* duckdns? Cloudflare?
+* In the root of this repository's directory, run `docker-compose up -d`
+* Sit back and watch your computer computate
 
 ## Description
 Easily stand up your own development, self hosted, and DevOps oriented stack. 
@@ -20,6 +25,9 @@ Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek
   * InfluxDB
   * Prometheus
   * AlertManager
+  * AWX
+  * Guacamole
+  * Zabbix
 ### Development:
   * VSCode (server)
   * Jupyter Notebook
@@ -31,6 +39,15 @@ Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek
   * Traefik
   * Springboot backend (custom java project)
   * Tornado (Custom python project)
+  * WordPress (needs to be added yet)
+  * Drupal
+### Documentation:
+* YouTrack
+* Netbox
+* Whiteboard
+* NextCloud
+### Misc:
+* Plex
 
 ## To Get Started
 * You will need docker and docker compose installed on your system
