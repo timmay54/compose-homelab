@@ -22,7 +22,7 @@ scrape_configs:
     bearer_token: 'TOKEN'
     static_configs:
     - targets: [
-      '192.168.1.temcity-ip:8111'
+      '192.168.1.teamcity-ip:8111'
     ]
 
   - job_name: 'gitlab'
