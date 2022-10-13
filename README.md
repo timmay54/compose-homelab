@@ -20,6 +20,10 @@ Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek
   * InfluxDB
   * Prometheus
   * AlertManager
+  * Kafka
+  * NodeRed
+  * Splunk
+  * Vault
 ### Development:
   * VSCode (server)
   * Jupyter Notebook
@@ -27,6 +31,7 @@ Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek
   * Postgres
   * MySQL
   * Neo4J
+  * Redis
 ### Hosting:
   * Traefik
   * Springboot backend (custom java project)
@@ -43,4 +48,10 @@ Some of the systems used(OBVIOUSLY not serves I have anything to do with, I seek
 
 ## Contribute?
 There are so many undiscovered services, of which could make great alternatives
+
 ### TO DO:
+* Organize the categories better
+* Create a CLI tool that will allow users to select tools from each category and generate a docker-compose file easier
+* Add nginx & caddy
+* documentation for general and advanced use
+* 
