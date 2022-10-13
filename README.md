@@ -12,6 +12,12 @@ Everything needed for a turnkey developer+devops+self-hosted system. Easily stan
 * In the root of this repository's directory, run `docker-compose up -d`
 * Sit back and watch your computer computate
 
+## Quick Start: 
+1. `git clone https://github.com/timmay54/compose-homelab.git`
+2. `cd compose-homelab`
+3. `mv example.env .env`
+4. `docker-compose up -d`
+
 ## Description
 Some of the systems used (OBVIOUSLY I have nothing to do with the services that are about to be listed, I seek no credit of the following services, google them for more research, I am not paid by any of these companies, use at your own risk, etc...):
 ### DevOps:
@@ -24,6 +30,10 @@ Some of the systems used (OBVIOUSLY I have nothing to do with the services that 
   * InfluxDB
   * Prometheus
   * AlertManager
+  * Kafka
+  * NodeRed
+  * Splunk
+  * Vault
 ### Development:
   * VSCode (server)
   * Jupyter Notebook
@@ -32,6 +42,7 @@ Some of the systems used (OBVIOUSLY I have nothing to do with the services that 
   * MariaDB
   * MySQL
   * Neo4J
+  * Redis
 ### Hosting:
   * Traefik
   * Springboot backend (custom java project)
@@ -49,6 +60,11 @@ Leveraging Traefik is most of the magic behind the scenes. With my DD-WRT router
 There are so many undiscovered services, of which could make great alternatives
 
 ## TO DO:
+* Organize the categories better
+* Create a CLI tool that will allow users to select tools from each category and generate a docker-compose file easier
+* Add nginx & caddy
+* documentation for general and advanced use
+* 
 * Scripts:
   * Set up folder heiarchy
   * Something like JHipster init script, allowing users to change out service for other brands
