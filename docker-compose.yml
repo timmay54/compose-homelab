@@ -14,27 +14,27 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.http.routers.grafana-router.rule=Host(`grafana.${DOMAIN_NAME}`)"
-      #- "traefik.http.routers.grafana-router.entrypoints=websecure"
       - "traefik.enable=true"
       - "traefik.port=3000"
 
-  # prometheus:
-  #   image: prom/prometheus
-  #   volumes:
-  #     - ./prometheus/conf:/etc/prometheus/
-  #     - ./prometheus/data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-  #     - '--web.console.templates=/usr/share/prometheus/consoles'
-  #   ports:
-  #     - 9090:9090
-  #   restart: unless-stopped
-  #   labels:
-  #     - "traefik.http.routers.prometheus-router.rule=Host(`prometheus.yourdnsname.duckdns.org`)
-  #     - "traefik.enable=true"
-  #     - "traefik.port=9090"
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/conf:/etc/prometheus/
+      - ./prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle' # curl -X POST prometheus:9090/-/reload
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    labels:
+      - "traefik.http.routers.prometheus-router.rule=Host(`prometheus.yourdnsname.duckdns.org`)"
+      - "traefik.enable=true"
+      - "traefik.port=9090"
 
   vault:
     image: vault
@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
 
   traefik:
-    image: traefik:v2.3.5
+    image: traefik:v2.9
     command:
       - '--api.insecure=true --providers.docker'
       # - --certresolv.myresolver.acme.storage=/shared/acme.json
@@ -87,7 +87,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.yml:/traefik.yml
-      #- ./shared:/shared
+      - ./acme/acme.json:/acme.json
+      - ./traefik/dynamic:/dynamic
     environment:
       - DUCKDNS_TOKEN=<22589631478521474102369963>
     labels:
@@ -142,28 +143,29 @@ services:
       - "traefik.http.routers.mesa-simulation.tls.certresolver=le"
       - "traefik.frontend.rule=Host:mesa-simulation"
 
-  # authelia:
-  #   image: authelia/authelia
-  #   volumes:
-  #     - ./authelia:/config
-  #   # networks:
-  #   #   - net
-  #   labels:
-  #     - 'traefik.enable=true'
-  #     - 'traefik.http.routers.authelia.rule=Host(`login.yourdnsname.duckdns.org`)'
-  #     - 'traefik.http.routers.authelia.entrypoints=websecure'
-  #     - 'traefik.http.routers.authelia.tls=true'
-  #     - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://login.yourdnsname.duckdns.org/'
-  #     - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
-  #     - 'traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
-  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.address=http://authelia:9091/api/verify?auth=basic'
-  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.trustForwardHeader=true'
-  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
-  #   expose:
-  #     - 9091
-  #   restart: unless-stopped
-  #   environment:
-  #     - TZ=America/Chicago
+  authelia:
+    # DAtabase related error? Migrations? Probably need to change to newer mysql
+    image: authelia/authelia
+    volumes:
+      - ./authelia:/config
+    # networks:
+    #   - net
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.authelia.rule=Host(`login.yourdnsname.duckdns.org`)'
+      - 'traefik.http.routers.authelia.entrypoints=websecure'
+      #- 'traefik.http.routers.authelia.tls=true'
+      - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://login.yourdnsname.duckdns.org/'
+      - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
+      - 'traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
+      - 'traefik.http.middlewares.authelia-basic.forwardauth.address=http://authelia:9091/api/verify?auth=basic'
+      - 'traefik.http.middlewares.authelia-basic.forwardauth.trustForwardHeader=true'
+      - 'traefik.http.middlewares.authelia-basic.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
+    expose:
+      - 9091
+    restart: unless-stopped
+    environment:
+      - TZ=America/Chicago
 
   #radarr:
 
