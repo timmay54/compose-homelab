@@ -1,5 +1,5 @@
-version: '3.1'
-# Updated September 7th 2021
+version: '3.3'
+# Updated October 12th 2022
 
 services:
   grafana:
@@ -8,33 +8,50 @@ services:
       - 3000:3000
     volumes:
       - ./grafana/data:/var/lib/grafana
-    environment: # verticle-flowhook-datasource,
+    environment:
+      # verticle-flowhook-datasource,
       GF_INSTALL_PLUGINS: yesoreyeram-boomtheme-panel, agenty-flowcharting-panel, grafana-github-datasource, fifemon-graphql-datasource
     restart: unless-stopped
     labels:
       - "traefik.http.routers.grafana-router.rule=Host(`grafana.${DOMAIN_NAME}`)"
-      #- "traefik.http.routers.grafana-router.entrypoints=websecure"
       - "traefik.enable=true"
       - "traefik.port=3000"
-   
-  # prometheus:
-  #   image: prom/prometheus
-  #   volumes:
-  #     - ./prometheus/conf:/etc/prometheus/
-  #     - ./prometheus/data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-  #     - '--web.console.templates=/usr/share/prometheus/consoles'
-  #   ports:
-  #     - 9090:9090
-  #   restart: unless-stopped
-  #   labels:
-  #     - "traefik.http.routers.prometheus-router.rule=Host(`prometheus.yourdnsname.duckdns.org`)
-  #     - "traefik.enable=true"
-  #     - "traefik.port=9090"
-  
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/conf:/etc/prometheus/
+      - ./prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle' # curl -X POST prometheus:9090/-/reload
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    labels:
+      - "traefik.http.routers.prometheus-router.rule=Host(`prometheus.yourdnsname.duckdns.org`)"
+      - "traefik.enable=true"
+      - "traefik.port=9090"
+
+  vault:
+    image: vault
+    ports:
+      - "8200:8200"
+    restart: unless-stopped
+    volumes:
+      - ./vault/config:/vault/config
+      - ./vault/policies:/vault/policies
+      - ./vault/data:/vault/data
+      - ./vault/logs:/vault/logs
+    cap_add:
+      - IPC_LOCK
+    # environment:
+    #   - VAULT_ADDR=http://127.0.0.1:8200
+    entrypoint: vault server -config=/vault/config/config.hcl
+
   influxdb:
     image: influxdb
     ports:
@@ -54,8 +71,8 @@ services:
     restart: unless-stopped
 
   traefik:
-    image: traefik:v2.3.5
-    command: 
+    image: traefik:v2.9
+    command:
       - '--api.insecure=true --providers.docker'
       # - --certresolv.myresolver.acme.storage=/shared/acme.json
       - --serversTransport.insecureSkipVerify=true
@@ -70,9 +87,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.yml:/traefik.yml
-      #- ./shared:/shared
+      - ./acme/acme.json:/acme.json
+      - ./traefik/dynamic:/dynamic
     environment:
-      - DUCKDNS_TOKEN=4d3fbc7c-718f-4807-ba8e-7fca0a14177e
+      - DUCKDNS_TOKEN=<22589631478521474102369963>
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.traefik.rule=Host(`traefik.yourdnsname.duckdns.org`)'
@@ -102,7 +120,7 @@ services:
       - "traefik.enable=true"
 
   mesa-simulation:
-    build: 
+    build:
       context: ../git/mesa-covid-simulation/
       dockerfile: "Dockerfile2"
     image: mesa-simulation:dev
@@ -124,29 +142,30 @@ services:
       - "traefik.http.routers.mesa-simulation.tls=true"
       - "traefik.http.routers.mesa-simulation.tls.certresolver=le"
       - "traefik.frontend.rule=Host:mesa-simulation"
-  
-  # authelia:
-  #   image: authelia/authelia
-  #   volumes:
-  #     - ./authelia:/config
-  #   # networks:
-  #   #   - net
-  #   labels:
-  #     - 'traefik.enable=true'
-  #     - 'traefik.http.routers.authelia.rule=Host(`login.yourdnsname.duckdns.org`)'
-  #     - 'traefik.http.routers.authelia.entrypoints=websecure'
-  #     - 'traefik.http.routers.authelia.tls=true'
-  #     - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://login.yourdnsname.duckdns.org/'
-  #     - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
-  #     - 'traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
-  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.address=http://authelia:9091/api/verify?auth=basic'
-  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.trustForwardHeader=true'
-  #     - 'traefik.http.middlewares.authelia-basic.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
-  #   expose:
-  #     - 9091
-  #   restart: unless-stopped
-  #   environment:
-  #     - TZ=America/Chicago
+
+  authelia:
+    # DAtabase related error? Migrations? Probably need to change to newer mysql
+    image: authelia/authelia
+    volumes:
+      - ./authelia:/config
+    # networks:
+    #   - net
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.authelia.rule=Host(`login.yourdnsname.duckdns.org`)'
+      - 'traefik.http.routers.authelia.entrypoints=websecure'
+      #- 'traefik.http.routers.authelia.tls=true'
+      - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://login.yourdnsname.duckdns.org/'
+      - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
+      - 'traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
+      - 'traefik.http.middlewares.authelia-basic.forwardauth.address=http://authelia:9091/api/verify?auth=basic'
+      - 'traefik.http.middlewares.authelia-basic.forwardauth.trustForwardHeader=true'
+      - 'traefik.http.middlewares.authelia-basic.forwardauth.authResponseHeaders=Remote-User, Remote-Groups, Remote-Name, Remote-Email'
+    expose:
+      - 9091
+    restart: unless-stopped
+    environment:
+      - TZ=America/Chicago
 
   #radarr:
 
@@ -194,7 +213,8 @@ services:
       - /var/log:/var/log
     command: -config.file=/etc/promtail/config.yml
 
-  teamcity-server: # Have to make this schema inside db
+  teamcity-server:
+    # Have to make this schema inside db
     image: jetbrains/teamcity-server
     ports:
       - "8111:8111"
@@ -249,10 +269,10 @@ services:
     healthcheck:
       disable: true
     environment:
-    # nginx['redirect_http_to_https'] = false
+      # nginx['redirect_http_to_https'] = false
       GITLAB_OMNIBUS_CONFIG: |
         external_url 'https://gitlab.yourdnsname.duckdns.org'
-        
+
         nginx['listen_port'] = 443
         nginx['listen_https'] = false
         nginx['proxy_set_headers'] = {
@@ -277,7 +297,7 @@ services:
       - ./gitlab/config:/etc/gitlab
       - ./gitlab/logs:/var/log/gitlab
       - ./gitlab/data:/var/opt/gitlab
-      
+
   redmine:
     image: redmine
     restart: unless-stopped
@@ -308,7 +328,7 @@ services:
       MYSQL_DATABASE: redmine-db
     volumes:
       - ./mysql/data:/var/lib/mysql
-    ports: 
+    ports:
       - 3306:3306
     labels:
       - "traefik.http.routers.mysql.rule=Host(`mysql.yourdnsname.duckdns.org`)"
@@ -338,7 +358,7 @@ services:
       #- HTTPS_PROXY=http://proxy.domain.com
     depends_on:
       - mongo
-    #ports:
+      #ports:
       #- 3000:3000
     labels:
       - "traefik.backend=rocketchat"
@@ -349,8 +369,8 @@ services:
     image: mongo:4.0
     restart: unless-stopped
     volumes:
-     - ./mongo/data/db:/data/db
-     - ./mongo/data/dump:/dump
+      - ./mongo/data/db:/data/db
+      - ./mongo/data/dump:/dump
     command: mongod --smallfiles --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
     labels:
       - "traefik.enable=true"
@@ -382,7 +402,7 @@ services:
       - ROCKETCHAT_USER=bot
       - ROCKETCHAT_PASSWORD=botpassword
       - BOT_NAME=bot
-  # you can add more scripts as you'd like here, they need to be installable by npm
+      # you can add more scripts as you'd like here, they need to be installable by npm
       - EXTERNAL_SCRIPTS=hubot-help,hubot-seen,hubot-links,hubot-diagnostics
     depends_on:
       - rocketchat
@@ -390,7 +410,7 @@ services:
       - "traefik.enable=true"
     volumes:
       - ./hubot/scripts:/home/hubot/scripts
-  # this is used to expose the hubot port for notifications on the host on port 3001, e.g. for hubot-jenkins-notifier
+    # this is used to expose the hubot port for notifications on the host on port 3001, e.g. for hubot-jenkins-notifier
     ports:
       - 3001:8080
 
@@ -421,16 +441,130 @@ services:
   # morgue:
   #   image: etsy/morgue
 
-  # artifactory:
-  #   image: jfrog/artifactory
+  artifactory:
+    image: releases-docker.jfrog.io/jfrog/artifactory-oss
+    ports:
+      - 8181:8081
+      - 8182:8082
+    volumes:
+      - ./artifactory/var:/var/opt/jfrog/artifactory
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
 
+  splunk:
+    image: splunk/splunk
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=password01
+      # $ SPLUNK_PASSWORD=<password> docker-compose up -d
+    ports:
+      - 8685:8000
+
+  kafka:
+    image: 'bitnami/kafka:latest'
+    hostname: kafka.example.com
+    ports:
+      - '9092'
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=SASL_SSL://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=SASL_SSL://:9092
+      - KAFKA_ZOOKEEPER_USER=kafka
+      - KAFKA_ZOOKEEPER_PASSWORD=kafka_password
+      - KAFKA_CLIENT_USERS=user
+      - KAFKA_CLIENT_PASSWORDS=password
+
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    ports:
+      - '2181:2181'
+    environment:
+      - ZOO_ENABLE_AUTH=yes
+      - ZOO_SERVER_USERS=kafka
+      - ZOO_SERVER_PASSWORDS=kafka_password
+
+  jenkins-server:
+    image: jenkins/jenkins:lts
+    privileged: true
+    user: root
+    ports:
+      - 8083:8080
+      - 50003:50000
+    volumes:
+      - ./jenkins/data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  jenkins-agent:
+    image: jenkins/agent:bullseye-jdk11
+    #init: true
+
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper-kafka:2181
+      KAFKA_CLUSTERS_0_JMXPORT: 9997
+
+  redis:
+    command: "redis-server --requirepass tempPassword"
+    volumes:
+      - ./redis/data:/var/lib/redis
+      - ./redis/unknown:/data # THIS ONE is where the actual DB data sits, without this, data does not persist.
+    image: redis
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+
+  netbox:
+    image: netboxcommunity/netbox
+    #privileged: true
+    #container_name: netbox
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      #- SUPERUSER_EMAIL=<SUPERUSER_EMAIL>
+      #- SUPERUSER_PASSWORD=<SUPERUSER_PASSWORD>
+      #- ALLOWED_HOST=<ALLOWED_HOST>
+      - DB_NAME=netbox
+      - DB_USER=testUser
+      - DB_PASSWORD=testPassword1
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=tempPassword
+      - REDIS_DB_TASK=1
+      - SECRET_KEY=VmXKsJJit7d0NJ
+      #- REDIS_DB_CACHE=<REDIS_DB_CACHE>
+    volumes:
+      - ./netbox/data/netbox/:/opt/netbox
+      # - ./netbox/data/netbox/startup_scripts/:/opt/netbox/startup_scripts
+      # - ./netbox/data/netbox/initializers:/opt/netbox/initializers
+      # - ./netbox/data/netbox/netbox/:/opt/netbox/netbox
+      - ./netbox/configuration:/etc/netbox/config
+      #- ./netbox/misc/local_requirements.txt:/opt/netbox/local_requirements.txt
+      # - ./netbox/reports:/etc/netbox/reports
+      # - ./netbox/scripts:/etc/netbox/scripts
+      - ./netbox/data/netbox/netbox/media:/opt/netbox/netbox/media
+
+  node-red:
+    image: nodered/node-red
+    volumes:
+      - ./node-red:/data
+    ports:
+      - "1880:1880"
   # docker-registry:
   #   image: jfrog/container-registry
 
   # alerta
   #   image: alerta
 
-networks: 
+networks:
   default:
     external:
       name: compose_default

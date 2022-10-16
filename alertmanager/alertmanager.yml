@@ -1,0 +1,26 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 300s
+  receiver: 'email'
+
+receivers:
+  - name: 'email'
+    email_configs:
+    - to: 'yourMainEmail@production.com'
+      from: 'email_for_lab_environment@lablab.com'
+      smarthost: smtp.mail.google.com:465
+      auth_username: email_for_lab_environment@lablab.com
+      auth_identity: email_for_lab_environment@lablab.com
+      auth_password: gibberishfromemailprovider
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
