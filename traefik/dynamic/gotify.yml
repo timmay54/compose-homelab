@@ -1,0 +1,15 @@
+http:
+  routers:
+    gotify:
+      rule: "Host(`gotify.yourhostname.com`)"
+      service: gotify
+      priority: 1000
+      entrypoints:
+        - websecure
+        - web
+
+  services:
+    gotify:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.2:8192"
