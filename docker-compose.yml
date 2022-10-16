@@ -255,9 +255,9 @@ services:
   #   restart: unless-stopped
 
   gitlab:
-    image: 'gitlab/gitlab-ce:12.10.11-ce.0'
+    image: 'gitlab/gitlab-ce:14.9.5-ce.0'
     restart: unless-stopped
-    privileged: 'true'
+    privileged: true
     hostname: 'gitlab.yourdnsname.duckdns.org'
     labels:
       #- "traefik.docker.network=traefik_network"
